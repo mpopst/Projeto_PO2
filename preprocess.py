@@ -48,8 +48,12 @@ def main():
     df = leitura_eventos(group=0)
     print('ok')
     
-    print('Executando discretização espacial...',end='')
-    df = geo_discretizar(df,30,30)
+    # print('Executando discretização espacial...',end='')
+    # df = geo_discretizar(df,30,30)
+    # print('ok')
+    print('Executando discretização espacial em bairros...',end='')
+    info_bairros = pd.read_excel(os.path.join(ENTR_DATA_PATH,'info_bairros.xlsx'),index_col=0)
+    df = definir_bairros(df,info_bairros)
     print('ok')
 
     print('Executando discretização temporal...',end='')

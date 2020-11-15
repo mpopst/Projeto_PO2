@@ -1,6 +1,7 @@
 import os,sys
 import numpy as np
 import pandas as pd
+from tqdm import tqdm
 
 grupo_dias_dict = {
         0: {
@@ -13,6 +14,38 @@ grupo_dias_dict = {
             0:1,1:2,2:3,3:4,4:5,5:6,6:7
         }
     }
+
+def definir_bairros(df,df_aux):
+    '''
+    Discretiza os dados geograficos por bairros
+    
+    Parâmetros
+    ----------
+    df : {pandas.DataFrame}
+        dataframe com dados caracterizados por latitude e longitude
+    df_aux : {pandas.DataFrame}
+        dataframe com dados de latitude e longitude em bairros
+    '''
+
+    bairros = []
+    for _,row in tqdm(df.iterrows(),total=len(df),desc='Definindo bairros das chamadas'):
+        df_aux['dist_lat'] = (df_aux['lat'] - row['latitude']).abs()
+        df_aux['dist_lng'] = (df_aux['lng'] - row['longitude']).abs()
+        
+        df_aux['dist'] = df_aux['dist_lat']**2 + df_aux['dist_lng']**2
+        
+        r = df_aux.sort_values('dist').iloc[0,:]
+        
+        if r['cidade'] == 'Rio de Janeiro':
+            b = r['bairro']
+        else:
+            b = 'ERRO: Fora do Rio de Janeiro ({})'.format(r['cidade'])
+        
+        bairros.append(b)
+
+    df['bairro'] = bairros
+
+    return df
 
 def geo_discretizar(df,nx=30,ny=30):
     '''
@@ -69,7 +102,7 @@ def temp_discretizar(df,w='meia hora'):
     ----------
     df : {pandas.DataFrame}
         dataframe com dados caracterizados por latitude e longitude
-    w : {str}
+    w : {str ou int}
         tipo de janela de tempo (a partir da primeira data às zero horas) usada na discretização:
             meia hora => janelas de 30 minutos
             hora      => janelas de 60 minutos
@@ -84,6 +117,8 @@ def temp_discretizar(df,w='meia hora'):
         st = (dt_seconds / (60*60)).astype(int)
     elif w == 'dia':
         st = (dt_seconds / (60*60*24)).astype(int)
+    elif type(w) is int:
+        st = (w*dt_seconds / (60*60*24)).astype(int)
     df['t'] = st - st.min() + 1
     
     return df
@@ -106,7 +141,10 @@ def agrupar_dias(df,group=0):
 
     return wd.map(grupo_dias_dict[group])
 
-def calcular_distribuicao(df,t,g,i,p):
+def calcular_distribuicao(df,t,g,i,p,
+                        tipo_discretizacao_temp=0,col1='t',
+                        col2='grupo_dia',col3='bairro',col4='TipoViatura',
+                        dt_range=None):
     '''
     Calcula a distribuição de número de chamadas para um conjunto de filtros
 
@@ -122,13 +160,16 @@ def calcular_distribuicao(df,t,g,i,p):
         Grupo geográfico discretizado.
     p : {int}
         Indicador de prioridade (1 a 3).
+
+    cols: {str's}
+        Nome das colunas em df para match dos valores
     '''
     filtro = df.copy()
     # aplicar filtros
     filtro = filtro[
         (filtro['t']==t) &
         (filtro['grupo_dia']==g) &
-        (filtro['geo_discr'].str[2:].astype(int)==i) &
+        (filtro['bairro']==i) &
         (filtro['TipoViatura']==p)
     ]
     
@@ -136,13 +177,16 @@ def calcular_distribuicao(df,t,g,i,p):
     datas = filtro.groupby('data')['hora'].count()
     
     # adicionar datas sem chamadas (com zero)
-    dt_range = pd.date_range(df['data'].min(),df['data'].max())
+    if dt_range is None:
+        dt_range = pd.date_range(df['data'].min(),df['data'].max(),freq='D')
+        
     for dt in dt_range:
 
         # se a data passa no filtro de grupo
-        if grupo_dias_dict[0][dt.weekday()] == g:
+        if grupo_dias_dict[tipo_discretizacao_temp][dt.weekday()] == g:
             if not(dt in datas.index):
                 datas[dt] = 0
+
     datas.sort_index(inplace=True)
 
     return datas.values
