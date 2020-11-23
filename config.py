@@ -1,6 +1,6 @@
 import os, sys
 
-REPO_PATH = 'C:\\Users\\Elogroup\\GiovanniAmorim\\Personal\\EMAp\\PO2\\Trabalho'
+REPO_PATH = 'C:\\Users\\Elogroup\\GiovanniAmorim\\Personal\\EMAp\\PO2\\Projeto_PO2'
 
 DATA_PATH = os.path.join(REPO_PATH,'dados')
 
